@@ -16,7 +16,7 @@ def override_cfg(cfg, args):
     if args.alpha is not None:
         cfg['optimizer']['opt_hyperparameter']['alpha'] = args.alpha
     if args.rho is not None:
-        cfg['optimizer']['opt_hyperparameter']['rho'] = args.alpha
+        cfg['optimizer']['opt_hyperparameter']['rho'] = args.rho
     if args.model_name is not None:
         cfg['model']['model_name'] = args.model_name
     if args.opt_name is not None:
