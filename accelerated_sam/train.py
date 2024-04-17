@@ -57,7 +57,10 @@ framework_name = cfg['logging']['framework_name']
 if framework_name == 'tensorboard':
     writer = SummaryWriter(os.path.join('runs', logging_name))
 elif framework_name == 'wandb':
-    wandb.init(project=cfg['logging']['project_name'], name=logging_name)
+    wandb.init(
+        project=cfg['logging']['project_name'], name=logging_name,
+        config=cfg
+    )
 
 logging_dict = {}
 ################################
