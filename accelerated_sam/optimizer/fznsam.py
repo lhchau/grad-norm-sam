@@ -63,9 +63,8 @@ class FZNSAM(torch.optim.Optimizer):
                 
                 param_state = self.state[p]
                 
-                d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
-                param_state['d_norm_d_p'] = d_norm_d_p
-
+                param_state['d_norm_d_p'] = (d_p.sub(param_state['old_g'])).div(group['rho'])
+            
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                     
@@ -76,8 +75,9 @@ class FZNSAM(torch.optim.Optimizer):
         self.norm_d_norm_d_p = self._grad_norm(by='d_norm_d_p')
         for group in self.param_groups:
             step_size = group['lr']
-            for p in group["params"]:        
-                p.add_(param_state['exp_avg'].add(d_norm_d_p, alpha=self.new_grad_norm/self.norm_d_norm_d_p), alpha=-step_size)
+            for p in group["params"]:   
+                param_state = self.state[p]     
+                p.add_(param_state['exp_avg'].add(param_state['d_norm_d_p'], alpha=self.new_grad_norm/self.norm_d_norm_d_p), alpha=-step_size)
                 
         if (step + 1) % 352 == 0:
             self.sim1 = np.mean(sim1_list)
