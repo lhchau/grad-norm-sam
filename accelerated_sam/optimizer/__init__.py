@@ -6,6 +6,7 @@ from .samaccer import SAMACCER
 from .samyan import SAMYAN
 from .fsam import FSAM
 from .fzsam import FZSAM
+from .fzsam2 import FZSAM2
 
 
 def get_optimizer(
@@ -49,6 +50,12 @@ def get_optimizer(
         )
     elif opt_name == 'fzsam':
         return FZSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'fzsam2':
+        return FZSAM2(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
