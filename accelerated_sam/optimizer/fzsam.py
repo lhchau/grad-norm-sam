@@ -65,7 +65,7 @@ class FZSAM(torch.optim.Optimizer):
                 
                 param_state = self.state[p]
                 
-                if step >= 352:
+                if (step + 1) >= 352:
                     d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
                     param_state['d_norm_d_p'] = d_norm_d_p
 
@@ -77,7 +77,7 @@ class FZSAM(torch.optim.Optimizer):
                 if 'exp_avg' not in param_state:
                     param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
-                if step >= 352:
+                if (step + 1) >= 352:
                     p.add_(param_state['exp_avg'].add(d_norm_d_p, alpha=self.alpha), alpha=-step_size)
                 else:
                     p.add_(param_state['exp_avg'], alpha=-step_size)
