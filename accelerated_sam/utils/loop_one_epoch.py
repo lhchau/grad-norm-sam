@@ -55,6 +55,10 @@ def loop_one_epoch(
             try: 
                 logging_dict[(f'{loop_type.title()}/new_grad_norm', batch_idx)] = [optimizer.new_grad_norm, len(dataloader)]
             except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/norm_d_norm_d_p', batch_idx)] = [optimizer.norm_d_norm_d_p, len(dataloader)]
+            except: pass
               
             try: 
                 logging_dict[(f'{loop_type.title()}/num_clamped_elements', batch_idx)] = [optimizer.num_clamped_elements, len(dataloader)]

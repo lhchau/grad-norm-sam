@@ -47,7 +47,7 @@ class FZSAM(torch.optim.Optimizer):
         step = self.state["step"]
         sim1_list = []
         sim3_list = []
-        if step % 100 == 0:
+        if (step + 1) % 352 == 0:
             self.new_grad_norm = self._grad_norm()
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
@@ -58,7 +58,7 @@ class FZSAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
                 d_p = p.grad.data
                 
-                if step % 100 == 0:
+                if (step + 1) % 352 == 0:
                     sim3_list.append(self.cosine_similarity(self.state[p]["new_g"], d_p))
                     sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], d_p))
                 self.state[p]["new_g"] = p.grad.clone()
@@ -67,7 +67,8 @@ class FZSAM(torch.optim.Optimizer):
                 
                 if step >= 352:
                     d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
-                
+                    param_state['d_norm_d_p'] = d_norm_d_p
+
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                     
@@ -82,9 +83,10 @@ class FZSAM(torch.optim.Optimizer):
                     p.add_(param_state['exp_avg'], alpha=-step_size)
 
                 
-        if step % 100 == 0:
+        if (step + 1) % 352 == 0:
             self.sim1 = np.mean(sim1_list)
             self.sim3 = np.mean(sim3_list)
+            self.norm_d_norm_d_p = self._grad_norm(by='d_norm_d_p')
         
         if zero_grad: self.zero_grad()
 
@@ -98,20 +100,31 @@ class FZSAM(torch.optim.Optimizer):
         self.second_step()
 
     @torch.no_grad()
-    def _grad_norm(self):
+    def _grad_norm(self, by=None):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
-        norm = torch.norm(
-                    torch.stack([
-                        ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
-                        for group in self.param_groups for p in group["params"]
-                        if p.grad is not None
-                    ]),
-                    p=2
-               )
-        return norm
+        if by is None:
+            norm = torch.norm(
+                        torch.stack([
+                            ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                            for group in self.param_groups for p in group["params"]
+                            if p.grad is not None
+                        ]),
+                        p=2
+                )
+            return norm
+        else:
+            norm = torch.norm(
+                        torch.stack([
+                            ((torch.abs(p) if group["adaptive"] else 1.0) * self.state[p][by]).norm(p=2).to(shared_device)
+                            for group in self.param_groups for p in group["params"]
+                            if p.grad is not None
+                        ]),
+                        p=2
+                )
+            return norm
     
     @torch.no_grad()
-    def _weight_norm(self):
+    def _weight_norm(self, by=None):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
         norm = torch.norm(
                     torch.stack([
