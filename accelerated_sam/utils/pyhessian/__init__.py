@@ -94,6 +94,7 @@ def get_eigen_hessian_plot(name, net, criterion, dataloader, hessian_batch_size=
     save_plot_dir = f'./density_plot/{name}'
     if not os.path.exists(save_plot_dir):
         os.makedirs(save_plot_dir)
-    plt.savefig(f'{save_plot_dir}/ckpt_best.png', dpi=300)
+    # plt.savefig(f'{save_plot_dir}/ckpt_best.png', dpi=300)
     # Show the plot
-    plt.close()
+    # plt.close()
+    return plt

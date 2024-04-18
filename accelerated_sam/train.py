@@ -172,12 +172,13 @@ if __name__ == "__main__":
                 else: tmp_dict[key.lower()] = value
             wandb.log(tmp_dict)
             
-        get_eigen_hessian_plot(
+        figure = get_eigen_hessian_plot(
             name=logging_name, 
             net=net,
             criterion=criterion,
             dataloader=train_dataloader
         )
+        wandb.log({'train/top5_eigenvalue_density': wandb.Image(figure)})
         
     except KeyboardInterrupt as e:
         save_dir = os.path.join('checkpoint', logging_name)
