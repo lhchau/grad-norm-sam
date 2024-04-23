@@ -49,6 +49,8 @@ class FZSAM(torch.optim.Optimizer):
         sim3_list = []
         if (step + 1) % 352 == 0:
             self.new_grad_norm = self._grad_norm()
+            self.cnt_diff_sign = 0
+            self.cnt_reg_diff_sign = 0
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -61,13 +63,19 @@ class FZSAM(torch.optim.Optimizer):
                 if (step + 1) % 352 == 0:
                     sim3_list.append(self.cosine_similarity(self.state[p]["new_g"], d_p))
                     sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], d_p))
+                    self.cnt_diff_sign += (self.state[p]["old_g"].mul(d_p) < 0).sum().item()
                 self.state[p]["new_g"] = p.grad.clone()
                 
                 param_state = self.state[p]
                 
                 if (step + 1) >= 352:
-                    d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
+                    # d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
+                    d_norm_d_p = (param_state['old_g'].sub(d_p)).div(group['rho'])
                     param_state['d_norm_d_p'] = d_norm_d_p
+
+                if (step + 1) % 352 == 0:
+                    self.cnt_reg_diff_sign += (d_norm_d_p.mul(param_state["old_g"]) < 0).sum().item()
+
 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)

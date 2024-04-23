@@ -63,6 +63,14 @@ def loop_one_epoch(
             try: 
                 logging_dict[(f'{loop_type.title()}/num_clamped_elements', batch_idx)] = [optimizer.num_clamped_elements, len(dataloader)]
             except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/cnt_diff_sign', batch_idx)] = [optimizer.cnt_diff_sign, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/cnt_reg_diff_sign', batch_idx)] = [optimizer.cnt_reg_diff_sign, len(dataloader)]
+            except: pass
 
             try: 
                 logging_dict[(f'{loop_type.title()}/num_zero_elements', batch_idx)] = [optimizer.num_zero_elements, len(dataloader)]

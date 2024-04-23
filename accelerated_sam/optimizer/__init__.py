@@ -7,6 +7,7 @@ from .samyan import SAMYAN
 from .fsam import FSAM
 from .fzsam import FZSAM
 from .fznsam import FZNSAM
+from .grsam import GRSAM
 
 
 def get_optimizer(
@@ -50,6 +51,12 @@ def get_optimizer(
         )
     elif opt_name == 'fzsam':
         return FZSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'grsam':
+        return GRSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
