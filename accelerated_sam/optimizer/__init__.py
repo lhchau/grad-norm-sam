@@ -1,6 +1,7 @@
 import torch.optim as optim
 
 from .sam import SAM
+from .usam import USAM
 from .sama import SAMA
 from .samaccer import SAMACCER
 from .samyan import SAMYAN
@@ -8,6 +9,7 @@ from .fsam import FSAM
 from .fzsam import FZSAM
 from .fznsam import FZNSAM
 from .grsam import GRSAM
+from .mgrsam import MGRSAM
 
 
 def get_optimizer(
@@ -21,6 +23,12 @@ def get_optimizer(
         base_optimizer = optim.Adam
     if opt_name == 'sam':
         return SAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'usam':
+        return USAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
@@ -57,6 +65,12 @@ def get_optimizer(
         )
     elif opt_name == 'grsam':
         return GRSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'mgrsam':
+        return MGRSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter

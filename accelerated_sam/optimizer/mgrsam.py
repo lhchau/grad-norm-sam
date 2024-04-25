@@ -2,18 +2,19 @@ import torch
 import numpy as np
 
 
-class GRSAM(torch.optim.Optimizer):
+class MGRSAM(torch.optim.Optimizer):
     def __init__(self, params, base_optimizer, rho=0.05, alpha=0.1, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(GRSAM, self).__init__(params, defaults)
+        super(MGRSAM, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
         self.state["step"] = 0
         self.alpha = alpha
+        self.beta = 0.9
         self.k = 0
 
     @torch.no_grad()
@@ -70,6 +71,8 @@ class GRSAM(torch.optim.Optimizer):
                 if (step + 1) >= self.k:
                     d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
                     param_state['d_norm_d_p'] = d_norm_d_p.mul(self.old_grad_norm)
+                    param_state['exp_avg_d_norm_d_p'].lerp_(param_state['d_norm_d_p'], 1-self.beta)
+                    bias_correction1 = 1 - self.beta ** step
                     
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
@@ -79,7 +82,7 @@ class GRSAM(torch.optim.Optimizer):
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
 
                 if (step + 1) >= self.k:
-                    p.add_(param_state['exp_avg'].add(param_state['d_norm_d_p'], alpha=self.alpha), alpha=-step_size)
+                    p.add_(param_state['exp_avg'].add(param_state['d_norm_d_p'], alpha=self.alpha), alpha=-step_size/bias_correction1)
                 else:
                     p.add_(param_state['exp_avg'], alpha=-step_size)
 
