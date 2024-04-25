@@ -59,6 +59,18 @@ def loop_one_epoch(
             try: 
                 logging_dict[(f'{loop_type.title()}/norm_d_norm_d_p', batch_idx)] = [optimizer.norm_d_norm_d_p, len(dataloader)]
             except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm_sq', batch_idx)] = [optimizer.exp_avg_old_grad_norm_sq, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/var_old_grad', batch_idx)] = [optimizer.var_old_grad, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/norm_exp_avg_d_norm_d_p', batch_idx)] = [optimizer.norm_exp_avg_d_norm_d_p, len(dataloader)]
+            except: pass
               
             try: 
                 logging_dict[(f'{loop_type.title()}/num_clamped_elements', batch_idx)] = [optimizer.num_clamped_elements, len(dataloader)]

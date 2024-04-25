@@ -24,6 +24,8 @@ class MGRSAM(torch.optim.Optimizer):
      
         self.weight_norm = self._weight_norm()
         self.old_grad_norm = self._grad_norm()
+        self.exp_avg_old_grad_norm_sq = self.exp_avg_old_grad_norm_sq * self.beta + (1 - self.beta) * (self.old_grad_norm ** 2)
+        self.var_old_grad = self.var_old_grad * self.beta + (1 - self.beta) * ((self.old_grad_norm ** 2 - self.exp_avg_old_grad_norm_sq) ** 2)
         sim2_list = []
         for group in self.param_groups:
             scale = group["rho"] / (self.old_grad_norm + 1e-12)
@@ -71,6 +73,8 @@ class MGRSAM(torch.optim.Optimizer):
                 if (step + 1) >= self.k:
                     d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
                     param_state['d_norm_d_p'] = d_norm_d_p.mul(self.old_grad_norm)
+                    if 'exp_avg_d_norm_d_p' not in param_state:
+                        param_state['exp_avg_d_norm_d_p'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                     param_state['exp_avg_d_norm_d_p'].lerp_(param_state['d_norm_d_p'], 1-self.beta)
                     bias_correction1 = 1 - self.beta ** step
                     
@@ -91,6 +95,7 @@ class MGRSAM(torch.optim.Optimizer):
             self.sim3 = np.mean(sim3_list)
             if (step + 1) >= self.k:
                 self.norm_d_norm_d_p = self._grad_norm(by='d_norm_d_p')
+                self.norm_exp_avg_d_norm_d_p = self._grad_norm(by='exp_avg_d_norm_d_p')
         
         if zero_grad: self.zero_grad()
 

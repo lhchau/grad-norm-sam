@@ -23,6 +23,8 @@ class GRSAM(torch.optim.Optimizer):
      
         self.weight_norm = self._weight_norm()
         self.old_grad_norm = self._grad_norm()
+        self.exp_avg_old_grad_norm_sq = self.exp_avg_old_grad_norm_sq * self.beta + (1 - self.beta) * (self.old_grad_norm ** 2)
+        self.var_old_grad = self.var_old_grad * self.beta + (1 - self.beta) * ((self.old_grad_norm ** 2 - self.exp_avg_old_grad_norm_sq) ** 2)
         sim2_list = []
         for group in self.param_groups:
             scale = group["rho"] / (self.old_grad_norm + 1e-12)
