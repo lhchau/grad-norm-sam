@@ -15,6 +15,8 @@ class GRSAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.alpha = alpha
         self.k = 0
+        self.exp_avg_old_grad_norm_sq, self.var_old_grad = 0, 0
+
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
