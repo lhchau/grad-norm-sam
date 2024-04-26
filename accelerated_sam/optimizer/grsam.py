@@ -14,7 +14,7 @@ class GRSAM(torch.optim.Optimizer):
         self.defaults.update(self.base_optimizer.defaults)
         self.state["step"] = 0
         self.alpha = alpha
-        self.k = 0
+        self.k = 352
         self.exp_avg_old_grad_norm_sq, self.var_old_grad = 0, 0
 
 
@@ -34,7 +34,7 @@ class GRSAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
                 
-                if step % 100 == 0:
+                if step % 352 == 0:
                     sim2_list.append(self.cosine_similarity(self.state[p]["old_g"], p.grad))
                 
                 self.state[p]["old_p"] = p.data.clone()
@@ -42,7 +42,7 @@ class GRSAM(torch.optim.Optimizer):
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
                 self.state[p]["old_g"] = p.grad.clone()
-        if step % 100 == 0:
+        if step % 352 == 0:
             self.sim2 = np.mean(sim2_list)
     
         if zero_grad: self.zero_grad()

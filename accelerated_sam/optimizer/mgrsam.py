@@ -15,7 +15,8 @@ class MGRSAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.alpha = alpha
         self.beta = 0.9
-        self.k = 0
+        self.k = 352
+        self.stopping_k = 352 * 140
         self.exp_avg_old_grad_norm_sq, self.var_old_grad = 0, 0
 
     @torch.no_grad()
@@ -34,7 +35,7 @@ class MGRSAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
                 
-                if step % 100 == 0:
+                if step % 352 == 0:
                     sim2_list.append(self.cosine_similarity(self.state[p]["old_g"], p.grad))
                 
                 self.state[p]["old_p"] = p.data.clone()
@@ -42,7 +43,7 @@ class MGRSAM(torch.optim.Optimizer):
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
                 self.state[p]["old_g"] = p.grad.clone()
-        if step % 100 == 0:
+        if step % 352 == 0:
             self.sim2 = np.mean(sim2_list)
     
         if zero_grad: self.zero_grad()
@@ -71,7 +72,7 @@ class MGRSAM(torch.optim.Optimizer):
                     sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], d_p))
                 self.state[p]["new_g"] = p.grad.clone()
                 
-                if (step + 1) >= self.k:
+                if (step + 1) >= self.k and (step + 1) <= self.stopping_k:
                     d_norm_d_p = (d_p.sub(param_state['old_g'])).div(group['rho'])
                     param_state['d_norm_d_p'] = d_norm_d_p.mul(self.old_grad_norm)
                     if 'exp_avg_d_norm_d_p' not in param_state:
@@ -86,7 +87,7 @@ class MGRSAM(torch.optim.Optimizer):
                     param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
 
-                if (step + 1) >= self.k:
+                if (step + 1) >= self.k and (step + 1) <= self.stopping_k:
                     p.add_(param_state['exp_avg'].add(param_state['d_norm_d_p'], alpha=self.alpha), alpha=-step_size/bias_correction1)
                 else:
                     p.add_(param_state['exp_avg'], alpha=-step_size)
