@@ -13,8 +13,8 @@ class SAM(torch.optim.Optimizer):
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
         self.state["step"] = 0
+        self.beta = 0.9
         self.exp_avg_old_grad_norm_sq, self.var_old_grad = 0, 0
-
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
