@@ -47,10 +47,10 @@ class SAM(torch.optim.Optimizer):
     def second_step(self, zero_grad=False):
         step = self.state["step"]
         sim1_list = []
-        if step % 352 == 0:
+        if (step + 1) % 352 == 0:
             self.new_grad_norm = self._grad_norm()
             self.third_grad_norm = self._grad_norm(by='exp_avg_old_g')
-        self.var_old_grad = self.exp_avg_old_grad_norm_sq - self.third_grad_norm ** 2
+            self.var_old_grad = self.exp_avg_old_grad_norm_sq - self.third_grad_norm ** 2
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -60,7 +60,7 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
                 d_p = p.grad.data
                 
-                if step % 352 == 0:
+                if (step + 1) % 352 == 0:
                     sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], d_p))
                 self.state[p]["new_g"] = p.grad.clone()
                 
@@ -75,7 +75,7 @@ class SAM(torch.optim.Optimizer):
                 
                 p.add_(param_state['exp_avg'], alpha=-step_size)
                 
-        if step % 352 == 0:
+        if (step + 1) % 352 == 0:
             self.sim1 = np.mean(sim1_list)
         
         if zero_grad: self.zero_grad()
