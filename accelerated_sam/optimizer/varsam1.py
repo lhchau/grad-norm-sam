@@ -107,7 +107,7 @@ class VARSAM1(torch.optim.Optimizer):
                     param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
                 
-                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).add(param_state['full_d_norm_d_p'], alpha=self.alpha2)
+                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).sub(param_state['full_d_norm_d_p'], alpha=self.alpha2)
                 
                 p.add_(param_state['exp_avg'].add(regularized_term), alpha=-step_size)
                 
