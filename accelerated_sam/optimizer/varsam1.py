@@ -16,6 +16,7 @@ class VARSAM1(torch.optim.Optimizer):
         self.beta = 0.9
         self.alpha1, self.alpha2 = alpha1, alpha2
         self.exp_avg_old_grad_norm_sq, self.var_old_grad_norm_sq = 0, 0
+        self.beta1, self.beta2, self.beta3 = 0.9, 0.9, 0.9
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
@@ -28,14 +29,13 @@ class VARSAM1(torch.optim.Optimizer):
         
         for group in self.param_groups:
             scale = group["rho"] / (self.old_grad_norm + 1e-12)
-            momentum = group['momentum']
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
                 if 'exp_avg_old_g' not in param_state:
                     param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].mul_(momentum).add_(p.grad)
+                param_state['exp_avg_old_g'].lerp_(p.grad, 1-self.beta1)
                 
                 self.state[p]["old_p"] = p.data.clone()
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
@@ -67,6 +67,9 @@ class VARSAM1(torch.optim.Optimizer):
                 param_state["new_g"] = p.grad.clone()
                 
                 param_state['d_norm_d_p'] = (p.grad.sub(param_state['old_g'])).mul(self.old_grad_norm)
+                if 'exp_avg_d_norm_d_p' not in param_state:
+                    param_state['exp_avg_d_norm_d_p'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state['exp_avg_d_norm_d_p'].lerp_(param_state['d_norm_d_p'], self.beta2)
                 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state['exp_avg_old_g'] * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
@@ -91,7 +94,7 @@ class VARSAM1(torch.optim.Optimizer):
                 
                 if 'exp_avg_third_g' not in param_state:
                     param_state['exp_avg_third_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_third_g'].mul_(momentum).add_(p.grad)
+                param_state['exp_avg_third_g'].lerp_(p.grad, self.beta3)
                 
                 param_state['full_d_norm_d_p'] = (param_state['exp_avg_third_g'].sub(param_state['exp_avg_old_g'])).mul(self.third_grad_norm)
                 
@@ -100,7 +103,7 @@ class VARSAM1(torch.optim.Optimizer):
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                 
-                regularized_term = param_state['d_norm_d_p'].mul(self.alpha1).sub(param_state['full_d_norm_d_p'], alpha=self.alpha2)
+                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).sub(param_state['full_d_norm_d_p'], alpha=self.alpha2)
                 d_p.add_(regularized_term)
                 
                 if 'exp_avg' not in param_state:

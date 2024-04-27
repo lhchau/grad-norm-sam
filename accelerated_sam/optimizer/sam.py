@@ -26,7 +26,6 @@ class SAM(torch.optim.Optimizer):
         self.var_old_grad = self.var_old_grad * self.beta + (1 - self.beta) * ((self.old_grad_norm ** 2 - self.exp_avg_old_grad_norm_sq) ** 2)
         for group in self.param_groups:
             scale = group["rho"] / (self.old_grad_norm + 1e-12)
-            momentum = group["momentum"]
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -35,8 +34,8 @@ class SAM(torch.optim.Optimizer):
                 
                 if 'exp_avg_old_g' not in param_state:
                     param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].mul_(momentum).add_(p.grad)
-                
+                param_state['exp_avg_old_g'].lerp_(p.grad, 1-self.beta)
+                                
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
