@@ -30,9 +30,17 @@ def loop_one_epoch(
             first_loss.backward()        
             optimizer.first_step(zero_grad=True)
             
-            disable_running_stats(net)  # <- this is the important line
-            criterion(net(inputs), targets).backward()
-            optimizer.second_step(zero_grad=True)
+            if type(optimizer).__name__ == 'VARSAM':
+                criterion(net(inputs), targets).backward()
+                optimizer.second_step(zero_grad=True)
+                
+                disable_running_stats(net)  # <- this is the important line
+                criterion(net(inputs), targets).backward()
+                optimizer.third_step(zero_grad=True)
+            else:
+                disable_running_stats(net)  # <- this is the important line
+                criterion(net(inputs), targets).backward()
+                optimizer.second_step(zero_grad=True)
             
             with torch.no_grad():
                 loss += first_loss.item()
@@ -62,6 +70,10 @@ def loop_one_epoch(
             
             try: 
                 logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm_sq', batch_idx)] = [optimizer.exp_avg_old_grad_norm_sq, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/var_old_grad_norm_sq', batch_idx)] = [optimizer.var_old_grad_norm_sq, len(dataloader)]
             except: pass
             
             try: 

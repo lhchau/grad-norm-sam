@@ -10,6 +10,7 @@ from .fzsam import FZSAM
 from .fznsam import FZNSAM
 from .grsam import GRSAM
 from .mgrsam import MGRSAM
+from .varsam import VARSAM
 
 
 def get_optimizer(
@@ -77,6 +78,12 @@ def get_optimizer(
         )
     elif opt_name == 'fznsam':
         return FZNSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'varsam':
+        return VARSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
