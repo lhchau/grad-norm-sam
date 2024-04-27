@@ -103,14 +103,13 @@ class VARSAM1(torch.optim.Optimizer):
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                 
-                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).sub(param_state['full_d_norm_d_p'], alpha=self.alpha2)
-                d_p.add_(regularized_term)
-                
                 if 'exp_avg' not in param_state:
                     param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
                 
-                p.add_(param_state['exp_avg'], alpha=-step_size)
+                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).add(param_state['full_d_norm_d_p'], alpha=self.alpha2)
+                
+                p.add_(param_state['exp_avg'].add(regularized_term), alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
 
