@@ -15,7 +15,7 @@ class VARSAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.beta = 0.9
         self.alpha1 = alpha
-        self.alpha2 = 0.05
+        self.alpha2 = 0.5
         self.exp_avg_old_grad_norm_sq, self.var_old_grad_norm_sq = 0, 0
 
     @torch.no_grad()
@@ -96,7 +96,7 @@ class VARSAM(torch.optim.Optimizer):
                 
                 param_state['full_d_norm_d_p'] = (param_state['exp_avg_third_g'].sub(param_state['exp_avg_old_g']))
                 
-                d_p = param_state["old_g"]
+                d_p = p.grad
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)

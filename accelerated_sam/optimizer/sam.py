@@ -90,17 +90,28 @@ class SAM(torch.optim.Optimizer):
         self.second_step()
 
     @torch.no_grad()
-    def _grad_norm(self):
+    def _grad_norm(self, by=None):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
-        norm = torch.norm(
-                    torch.stack([
-                        ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
-                        for group in self.param_groups for p in group["params"]
-                        if p.grad is not None
-                    ]),
-                    p=2
-               )
-        return norm
+        if by is None:
+            norm = torch.norm(
+                        torch.stack([
+                            ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                            for group in self.param_groups for p in group["params"]
+                            if p.grad is not None
+                        ]),
+                        p=2
+                )
+            return norm
+        else:
+            norm = torch.norm(
+                        torch.stack([
+                            ((torch.abs(p) if group["adaptive"] else 1.0) * self.state[p][by]).norm(p=2).to(shared_device)
+                            for group in self.param_groups for p in group["params"]
+                            if p.grad is not None
+                        ]),
+                        p=2
+                )
+            return norm
     
     @torch.no_grad()
     def _weight_norm(self):
