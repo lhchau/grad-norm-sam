@@ -30,7 +30,7 @@ def loop_one_epoch(
             first_loss.backward()        
             optimizer.first_step(zero_grad=True)
             
-            if type(optimizer).__name__ == 'VARSAM':
+            if type(optimizer).__name__.startswith('VARSAM'):
                 criterion(net(inputs), targets).backward()
                 optimizer.second_step(zero_grad=True)
                 
