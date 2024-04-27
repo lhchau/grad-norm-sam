@@ -2,12 +2,12 @@ import torch
 import numpy as np
 
 
-class VARSAM(torch.optim.Optimizer):
+class VARSAM1(torch.optim.Optimizer):
     def __init__(self, params, base_optimizer, rho=0.05, alpha1=0.1, alpha2=0.1, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(VARSAM, self).__init__(params, defaults)
+        super(VARSAM1, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
@@ -95,7 +95,7 @@ class VARSAM(torch.optim.Optimizer):
                 
                 param_state['full_d_norm_d_p'] = (param_state['exp_avg_third_g'].sub(param_state['exp_avg_old_g'])).mul(self.third_grad_norm)
                 
-                d_p = param_state["old_g"]
+                d_p = param_state["new_g"]
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)

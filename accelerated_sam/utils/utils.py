@@ -15,6 +15,10 @@ import torch.nn.init as init
 def override_cfg(cfg, args):
     if args.alpha is not None:
         cfg['optimizer']['opt_hyperparameter']['alpha'] = args.alpha
+    if args.alpha1 is not None:
+        cfg['optimizer']['opt_hyperparameter']['alpha1'] = args.alpha1
+    if args.alpha2 is not None:
+        cfg['optimizer']['opt_hyperparameter']['alpha2'] = args.alpha2
     if args.rho is not None:
         cfg['optimizer']['opt_hyperparameter']['rho'] = args.rho
     if args.model_name is not None:
