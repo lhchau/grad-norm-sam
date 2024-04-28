@@ -33,15 +33,15 @@ class VARSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                if 'exp_avg_old_g' not in param_state:
-                    param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].lerp_(p.grad, 1-self.beta1)
+                if "exp_avg_old_g" not in param_state:
+                    param_state["exp_avg_old_g"] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state["exp_avg_old_g"].lerp_(p.grad, 1-self.beta1)
                 
-                self.state[p]["old_p"] = p.data.clone()
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
-                self.state[p]["old_g"] = p.grad.clone()
+                param_state["old_g"] = p.grad.clone()
+                param_state["e_w"] = e_w
     
         if zero_grad: self.zero_grad()
 
@@ -60,23 +60,25 @@ class VARSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
+                p.sub_(param_state["e_w"]) # get back to "w" from "w + e(w)"
                 
                 if (step + 1) % 352 == 0:
-                    sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], p.grad))
+                    sim1_list.append(self.cosine_similarity(param_state["old_g"], p.grad))
                 param_state["new_g"] = p.grad.clone()
                 
-                param_state['d_norm_d_p'] = (p.grad.sub(param_state['old_g']))
-                if 'exp_avg_d_norm_d_p' not in param_state:
-                    param_state['exp_avg_d_norm_d_p'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_d_norm_d_p'].lerp_(param_state['d_norm_d_p'], 1-self.beta2)
+                param_state["d_norm_d_p"] = (param_state["new_g"].sub(param_state['old_g']))
+                if "exp_avg_d_norm_d_p" not in param_state:
+                    param_state["exp_avg_d_norm_d_p"] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state["exp_avg_d_norm_d_p"].lerp_(param_state["d_norm_d_p"], 1-self.beta2)
                 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state['exp_avg_old_g'] * scale.to(p)
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state["exp_avg_old_g"] * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                
+                param_state["e_w"] = e_w
                     
         if (step + 1) % 352 == 0:
             self.sim1 = np.mean(sim1_list)
-            self.norm_d_norm_d_p = self._grad_norm(by='d_norm_d_p')
+            self.norm_d_norm_d_p = self._grad_norm(by="d_norm_d_p")
         
         if zero_grad: self.zero_grad()
         
@@ -90,37 +92,31 @@ class VARSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
 
-                p.data = param_state["old_p"]  # get back to "w" from "w + e(w)"
+                p.sub_(param_state["e_w"]) # get back to "w" from "w + e(w)"
                 
-                if 'exp_avg_third_g' not in param_state:
-                    param_state['exp_avg_third_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_third_g'].lerp_(p.grad, 1-self.beta3)
+                if "exp_avg_third_g" not in param_state:
+                    param_state["exp_avg_third_g"] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state["exp_avg_third_g"].lerp_(p.grad, 1-self.beta3)
                 
-                param_state['full_d_norm_d_p'] = (param_state['exp_avg_third_g'].sub(param_state['exp_avg_old_g']))
+                param_state["full_d_norm_d_p"] = (param_state["exp_avg_third_g"].sub(param_state["exp_avg_old_g"]))
                 
                 d_p = param_state["old_g"]
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                 
-                if 'exp_avg' not in param_state:
-                    param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg'].mul_(momentum).add_(d_p)
+                if "exp_avg" not in param_state:
+                    param_state["exp_avg"] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state["exp_avg"].mul_(momentum).add_(d_p)
                 
-                regularized_term = param_state['exp_avg_d_norm_d_p'].mul(self.alpha1).sub(param_state['full_d_norm_d_p'], alpha=self.alpha2)
+                regularized_term = (param_state["exp_avg_d_norm_d_p"].mul(self.alpha1)).sub(param_state["full_d_norm_d_p"], alpha=self.alpha2)
                 
-                p.add_(param_state['exp_avg'].add(regularized_term), alpha=-step_size)
+                p.add_(param_state["exp_avg"].add(regularized_term), alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
 
-    @torch.no_grad()
     def step(self, closure=None):
-        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(closure)  # the closure should do a full forward-backward pass
-
-        self.first_step(zero_grad=True)
-        closure()
-        self.second_step()
+        raise NotImplementedError("SAM doesn't work like the other optimizers, you should first call `first_step` and the `second_step`; see the documentation for more info.")
 
     @torch.no_grad()
     def _grad_norm(self, by=None):

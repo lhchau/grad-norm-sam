@@ -27,14 +27,15 @@ def loop_one_epoch(
             enable_running_stats(net)  # <- this is the important line
             outputs = net(inputs)
             first_loss = criterion(outputs, targets)
-            first_loss.backward()        
+            first_loss.backward(retain_graph=True)        
             optimizer.first_step(zero_grad=True)
             
             if type(optimizer).__name__.startswith('VARSAM'):
-                criterion(net(inputs), targets).backward()
+                disable_running_stats(net)  # <- this is the important line
+                second_loss = criterion(net(inputs), targets)
+                second_loss.backward(retain_graph=True)
                 optimizer.second_step(zero_grad=True)
                 
-                disable_running_stats(net)  # <- this is the important line
                 criterion(net(inputs), targets).backward()
                 optimizer.third_step(zero_grad=True)
             else:
