@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import math
 
 
 class FSAM(torch.optim.Optimizer):
@@ -15,14 +16,19 @@ class FSAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.beta1 = 0.9
         self.sigma = 1
+        self.exp_avg_noise, self.var_noise = 0, 0
+        self.bc = -1
+        self.uc = 1
+        self.total_step_num = 352 * 200
+
+    def get_ct(self, global_step_cnt):
+        return self.bc * global_step_cnt/self.total_step_num + self.uc*(1-global_step_cnt/self.total_step_num)
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state["step"] += 1
-        step = self.state["step"]
+        global_step_cnt = self.state["step"]
                 
-        if step % 100 == 0:
-            num_zero_elements, total_elements = 0, 0
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None: continue
@@ -32,37 +38,33 @@ class FSAM(torch.optim.Optimizer):
                 param_state["old_exp_avg"].lerp_(p.grad, 1 - self.beta1)
                 
                 param_state["d_t"] = p.grad - self.sigma * param_state["old_exp_avg"]
-                
-                if step % 100 == 0:
-                    num_zero_elements += (param_state["d_t"] == torch.zeros_like(p)).sum().item()
-                    total_elements += p.numel()
-                
-        sim2_list = []
+
         self.old_grad_norm = self._grad_norm(by="d_t")
+        
+        factor = 1
+        if self.old_grad_norm >= self.exp_avg_noise + self.get_ct(global_step_cnt)*math.sqrt(self.var_noise): # go SAM
+            factor = 2
         for group in self.param_groups:
-            scale = group["rho"] / (self.old_grad_norm + 1e-12)
+            scale = group["rho"] * factor / (self.old_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
-                if step % 100 == 0:
-                    sim2_list.append(self.cosine_similarity(self.state[p]["old_g"], p.grad))
                 param_state["old_p"] = p.data.clone()
                 param_state["old_g"] = p.grad.clone()
 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state["d_t"] * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
-        if step % 100 == 0:
-            self.sim2 = np.mean(sim2_list)
-            self.num_zero = num_zero_elements / total_elements
-    
+                
+        self.exp_avg_noise = self.beta1 * self.exp_avg_noise + (1 - self.beta1) * self.old_grad_norm
+        self.var_noise = self.beta1 * self.var_noise + (1 - self.beta1) * (self.exp_avg_noise - self.old_grad_norm)**2
+        
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
     def second_step(self, zero_grad=False):
         step = self.state["step"]
         sim1_list = []
-        sim3_list = []
-        if step % 100 == 0:
+        if step % 352 == 0:
             self.new_grad_norm = self._grad_norm()
         for group in self.param_groups:
             for p in group["params"]:
@@ -70,12 +72,10 @@ class FSAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
                 
                 if step % 100 == 0:
-                    sim3_list.append(self.cosine_similarity(self.state[p]["new_g"], p.grad))
                     sim1_list.append(self.cosine_similarity(self.state[p]["old_g"], p.grad))
                 self.state[p]["new_g"] = p.grad.clone()
-        if step % 100 == 0:
+        if step % 352 == 0:
             self.sim1 = np.mean(sim1_list)
-            self.sim3 = np.mean(sim3_list)
         
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
