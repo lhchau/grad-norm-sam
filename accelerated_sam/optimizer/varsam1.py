@@ -66,7 +66,7 @@ class VARSAM1(torch.optim.Optimizer):
                     sim1_list.append(self.cosine_similarity(param_state["old_g"], p.grad))
                 param_state["new_g"] = p.grad.clone()
                 
-                param_state["d_norm_d_p"] = (param_state["new_g"].sub(param_state['old_g']))
+                param_state["d_norm_d_p"] = (param_state["new_g"].sub(param_state['old_g'])).mul(self.old_grad_norm)
                 if "exp_avg_d_norm_d_p" not in param_state:
                     param_state["exp_avg_d_norm_d_p"] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state["exp_avg_d_norm_d_p"].lerp_(param_state["d_norm_d_p"], 1-self.beta2)
@@ -98,20 +98,22 @@ class VARSAM1(torch.optim.Optimizer):
                     param_state["exp_avg_third_g"] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state["exp_avg_third_g"].lerp_(p.grad, 1-self.beta3)
                 
-                param_state["full_d_norm_d_p"] = (param_state["exp_avg_third_g"].sub(param_state["exp_avg_old_g"]))
+                param_state["full_d_norm_d_p"] = (param_state["exp_avg_third_g"].sub(param_state["exp_avg_old_g"])).mul(self.third_grad_norm)
                 
                 d_p = param_state["new_g"]
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
+                    
+                regularized_term = (param_state["exp_avg_d_norm_d_p"].mul(self.alpha1)).add(param_state["full_d_norm_d_p"], alpha=self.alpha2)
+                
+                d_p.add_(regularized_term)
                 
                 if "exp_avg" not in param_state:
                     param_state["exp_avg"] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state["exp_avg"].mul_(momentum).add_(d_p)
                 
-                regularized_term = (param_state["exp_avg_d_norm_d_p"].mul(self.alpha1)).sub(param_state["full_d_norm_d_p"], alpha=self.alpha2)
-                
-                p.add_(param_state["exp_avg"].add(regularized_term), alpha=-step_size)
+                p.add_(param_state["exp_avg"], alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
 
