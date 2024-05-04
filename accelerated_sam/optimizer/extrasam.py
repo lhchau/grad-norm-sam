@@ -66,7 +66,6 @@ class EXTRASAM(torch.optim.Optimizer):
     def step_back(self, zero_grad=False):
         for group in self.param_groups:
             for p in group["params"]:
-                if p.grad is None: continue
                 param_state = self.state[p]
                 if 'step_length' not in param_state:
                     param_state['step_length'] = torch.zeros_like(p, memory_format=torch.preserve_format)
