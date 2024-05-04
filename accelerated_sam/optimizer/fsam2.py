@@ -30,7 +30,7 @@ class FSAM2(torch.optim.Optimizer):
                 param_state["old_exp_avg"].lerp_(p.grad, 1 - self.beta1)
                 
                 param_state["d_t"] = p.grad - self.sigma * param_state["old_exp_avg"]
-                param_state["d_t"].mul_(p.grad)
+                param_state["d_t"].mul_((p.grad).abs())
 
         self.old_grad_norm = self._grad_norm(by="d_t")
         
