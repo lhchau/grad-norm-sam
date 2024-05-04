@@ -42,7 +42,7 @@ class EXTRASAM(torch.optim.Optimizer):
     @torch.no_grad()
     def second_step(self, zero_grad=False):
         # self.new_grad_norm = self._grad_norm()
-        self.exp_avg_old_grad_norm = self._grad_norm(by='exp_avg_old_g')
+        # self.exp_avg_old_grad_norm = self._grad_norm(by='exp_avg_old_g')
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
