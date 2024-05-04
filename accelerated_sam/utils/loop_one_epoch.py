@@ -26,7 +26,7 @@ def loop_one_epoch(
             
             if type(optimizer).__name__ == 'EXTRASAM':
                 enable_running_stats(net)
-                with torch.no_grad:
+                with torch.no_grad():
                     outputs = net(inputs)
                     first_loss = criterion(outputs, targets)
                 optimizer.step_back()
