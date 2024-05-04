@@ -29,6 +29,10 @@ class EXTRASAM(torch.optim.Optimizer):
                 
                 p.add_(param_state['step_length'])
                 
+                # if 'exp_avg_old_g' not in param_state:
+                #     param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                # param_state['exp_avg_old_g'].lerp_(p.grad, 1-self.beta)
+                
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
@@ -37,11 +41,13 @@ class EXTRASAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def second_step(self, zero_grad=False):
-        self.new_grad_norm = self._grad_norm()
+        # self.new_grad_norm = self._grad_norm()
+        self.exp_avg_old_grad_norm = self._grad_norm(by='exp_avg_old_g')
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
             momentum = group['momentum']
+            rho = group["rho"] 
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -51,7 +57,8 @@ class EXTRASAM(torch.optim.Optimizer):
                 d_p = p.grad.data
                 
                 # param_state['step_length'] = d_p.mul(-step_size/self.new_grad_norm)
-                param_state['step_length'] = param_state["e_w"]
+                param_state['step_length'] = param_state["e_w"].mul(-1)
+                # param_state['step_length'] = param_state['exp_avg_old_g'].mul(-rho/self.exp_avg_old_grad_norm)
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
@@ -72,7 +79,6 @@ class EXTRASAM(torch.optim.Optimizer):
                 if 'step_length' not in param_state:
                     param_state['step_length'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 p.sub_(param_state['step_length'])
-
 
     @torch.no_grad()
     def step(self, closure=None):
