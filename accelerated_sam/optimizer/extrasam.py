@@ -50,7 +50,8 @@ class EXTRASAM(torch.optim.Optimizer):
                 
                 d_p = p.grad.data
                 
-                param_state['step_length'] = d_p.mul(-step_size/self.new_grad_norm)
+                # param_state['step_length'] = d_p.mul(-step_size/self.new_grad_norm)
+                param_state['step_length'] = param_state["e_w"]
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
