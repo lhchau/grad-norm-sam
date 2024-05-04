@@ -37,6 +37,7 @@ class EXTRASAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def second_step(self, zero_grad=False):
+        self.new_grad_norm = self._grad_norm()
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -49,6 +50,8 @@ class EXTRASAM(torch.optim.Optimizer):
                 
                 d_p = p.grad.data
                 
+                param_state['step_length'] = d_p.mul(-step_size/self.new_grad_norm)
+                
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
                     
@@ -56,9 +59,7 @@ class EXTRASAM(torch.optim.Optimizer):
                     param_state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg'].mul_(momentum).add_(d_p)
                 
-                param_state['step_length'] = param_state['exp_avg'].mul(-step_size)
-                
-                p.add_(param_state['step_length'])
+                p.add_(param_state['exp_avg'], alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
     
