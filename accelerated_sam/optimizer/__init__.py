@@ -13,6 +13,7 @@ from .mgrsam import MGRSAM
 from .varsam import VARSAM
 from .varsam1 import VARSAM1
 from .varsam2 import VARSAM2
+from .fsam2 import FSAM2
 
 
 def get_optimizer(
@@ -98,6 +99,12 @@ def get_optimizer(
         )
     elif opt_name == 'varsam2':
         return VARSAM2(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'fsam2':
+        return FSAM2(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter

@@ -3,12 +3,12 @@ import numpy as np
 import math
 
 
-class FSAM(torch.optim.Optimizer):
+class FSAM2(torch.optim.Optimizer):
     def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(FSAM, self).__init__(params, defaults)
+        super(FSAM2, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
@@ -16,18 +16,10 @@ class FSAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.beta1 = 0.9
         self.sigma = 1
-        self.exp_avg_noise, self.var_noise = 0, 0
-        self.bc = -1
-        self.uc = 1
-        self.total_step_num = 352 * 200
-
-    def get_ct(self, global_step_cnt):
-        return self.bc * global_step_cnt/self.total_step_num + self.uc*(1-global_step_cnt/self.total_step_num)
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state["step"] += 1
-        global_step_cnt = self.state["step"]
                 
         for group in self.param_groups:
             for p in group["params"]:
@@ -38,14 +30,12 @@ class FSAM(torch.optim.Optimizer):
                 param_state["old_exp_avg"].lerp_(p.grad, 1 - self.beta1)
                 
                 param_state["d_t"] = p.grad - self.sigma * param_state["old_exp_avg"]
+                param_state["d_t"].mul_(p.grad)
 
         self.old_grad_norm = self._grad_norm(by="d_t")
         
-        factor = 1
-        if self.old_grad_norm >= self.exp_avg_noise + self.get_ct(global_step_cnt)*math.sqrt(self.var_noise): # go SAM
-            factor = 2
         for group in self.param_groups:
-            scale = group["rho"] * factor / (self.old_grad_norm + 1e-12)
+            scale = group["rho"] / (self.old_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -55,9 +45,6 @@ class FSAM(torch.optim.Optimizer):
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state["d_t"] * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
-        self.exp_avg_noise = self.beta1 * self.exp_avg_noise + (1 - self.beta1) * self.old_grad_norm
-        self.var_noise = self.beta1 * self.var_noise + (1 - self.beta1) * (self.exp_avg_noise - self.old_grad_norm)**2
-        
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
