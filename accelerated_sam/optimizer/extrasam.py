@@ -15,7 +15,7 @@ class EXTRASAM(torch.optim.Optimizer):
         self.state["step"] = 0
         self.beta = 0.9
         self.exp_avg_old_grad_norm_sq, self.var_old_grad = 0, 0
-        self.old_grad_norm = -1
+        self.old_grad_norm = torch.ones(1)
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
