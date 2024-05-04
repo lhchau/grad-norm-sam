@@ -14,6 +14,7 @@ from .varsam import VARSAM
 from .varsam1 import VARSAM1
 from .varsam2 import VARSAM2
 from .fsam2 import FSAM2
+from .extrasam import EXTRASAM
 
 
 def get_optimizer(
@@ -105,6 +106,12 @@ def get_optimizer(
         )
     elif opt_name == 'fsam2':
         return FSAM2(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'extrasam':
+        return EXTRASAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter

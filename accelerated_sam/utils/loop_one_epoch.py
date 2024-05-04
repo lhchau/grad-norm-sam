@@ -24,24 +24,36 @@ def loop_one_epoch(
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             inputs, targets = inputs.to(device), targets.to(device)
             
-            enable_running_stats(net)  # <- this is the important line
-            outputs = net(inputs)
-            first_loss = criterion(outputs, targets)
-            first_loss.backward(retain_graph=True)        
-            optimizer.first_step(zero_grad=True)
-            
-            if type(optimizer).__name__.startswith('VARSAM'):
-                disable_running_stats(net)  # <- this is the important line
-                second_loss = criterion(net(inputs), targets)
-                second_loss.backward(retain_graph=True)
-                optimizer.second_step(zero_grad=True)
-                
+            if type(optimizer).__name__ == 'EXTRASAM':
+                enable_running_stats(net)
+                with torch.no_grad:
+                    outputs = net(inputs)
+                    first_loss = criterion(outputs, targets)
+                optimizer.step_back()
+                disable_running_stats(net)
                 criterion(net(inputs), targets).backward()
-                optimizer.third_step(zero_grad=True)
+                optimizer.first_step(zero_grad=True)
+                criterion(net(inputs), targets).backward()
+                optimizer.second_step(zero_grad=True)
             else:
-                disable_running_stats(net)  # <- this is the important line
-                criterion(net(inputs), targets).backward()
-                optimizer.second_step(zero_grad=True)
+                enable_running_stats(net)  # <- this is the important line
+                outputs = net(inputs)
+                first_loss = criterion(outputs, targets)
+                first_loss.backward(retain_graph=True)        
+                optimizer.first_step(zero_grad=True)
+                
+                if type(optimizer).__name__.startswith('VARSAM'):
+                    disable_running_stats(net)  # <- this is the important line
+                    second_loss = criterion(net(inputs), targets)
+                    second_loss.backward(retain_graph=True)
+                    optimizer.second_step(zero_grad=True)
+                    
+                    criterion(net(inputs), targets).backward()
+                    optimizer.third_step(zero_grad=True)
+                else:
+                    disable_running_stats(net)  # <- this is the important line
+                    criterion(net(inputs), targets).backward()
+                    optimizer.second_step(zero_grad=True)
             
             with torch.no_grad():
                 loss += first_loss.item()
