@@ -3,10 +3,10 @@ import numpy as np
 
 # Worst Sharpness-Aware Minimization
 class WSAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+    def __init__(self, params, base_optimizer, rho=0.05, inner_rho=0.01, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
+        defaults = dict(rho=rho, inner_rho=inner_rho, adaptive=adaptive, **kwargs)
         super(WSAM, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
@@ -44,7 +44,7 @@ class WSAM(torch.optim.Optimizer):
             weight_decay = group["weight_decay"]
             step_size = group['lr']
             momentum = group['momentum']
-            rho = group["rho"] 
+            inner_rho = group["inner_rho"] 
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -54,7 +54,7 @@ class WSAM(torch.optim.Optimizer):
                 
                 d_p = p.grad.data
                 
-                param_state['step_length'] = param_state['exp_avg_old_g'].mul(-rho/self.exp_avg_old_grad_norm)
+                param_state['step_length'] = param_state['exp_avg_old_g'].mul(-inner_rho/self.exp_avg_old_grad_norm)
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
