@@ -31,7 +31,19 @@ def loop_one_epoch(
             optimizer.first_step(zero_grad=True)
             
             opt_name = type(optimizer).__name__
-            if opt_name.startswith('VARSAM') or opt_name == "EXTRASAM":
+            
+            if opt_name == 'WSAM':
+                enable_running_stats(net)
+                with torch.no_grad():
+                    outputs = net(inputs)
+                    first_loss = criterion(outputs, targets)
+                optimizer.step_forward()
+                disable_running_stats(net)
+                criterion(net(inputs), targets).backward()
+                optimizer.first_step(zero_grad=True)
+                criterion(net(inputs), targets).backward()
+                optimizer.second_step(zero_grad=True)
+            elif opt_name.startswith('VARSAM') or opt_name == "EXTRASAM":
                 disable_running_stats(net)  # <- this is the important line
                 second_loss = criterion(net(inputs), targets)
                 second_loss.backward(retain_graph=True)
