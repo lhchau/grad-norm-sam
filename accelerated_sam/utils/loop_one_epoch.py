@@ -87,6 +87,10 @@ def loop_one_epoch(
             except: pass
             
             try: 
+                logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm', batch_idx)] = [optimizer.exp_avg_old_grad_norm, len(dataloader)]
+            except: pass
+            
+            try: 
                 logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm_sq', batch_idx)] = [optimizer.exp_avg_old_grad_norm_sq, len(dataloader)]
             except: pass
             
