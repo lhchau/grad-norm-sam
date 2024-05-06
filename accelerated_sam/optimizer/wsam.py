@@ -19,7 +19,6 @@ class WSAM(torch.optim.Optimizer):
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state["step"] += 1
-     
         self.old_grad_norm = self._grad_norm()
         for group in self.param_groups:
             scale = group["rho"] / (self.old_grad_norm + 1e-12)
@@ -30,12 +29,12 @@ class WSAM(torch.optim.Optimizer):
                 # if 'exp_avg_old_g' not in param_state:
                     # param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 # param_state['exp_avg_old_g'].mul_(self.beta).add_(p.grad)
-                param_state['old_g'] = p.grad
+                param_state['old_g'] = p.grad.clone().detach()
                 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
-                param_state["e_w"] = e_w
+                param_state["e_w"] = e_w.clone().detach()
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
@@ -45,7 +44,7 @@ class WSAM(torch.optim.Optimizer):
             weight_decay = group["weight_decay"]
             step_size = group['lr']
             momentum = group['momentum']
-            # inner_rho = group["inner_rho"]
+            inner_rho = group["inner_rho"]
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -55,7 +54,7 @@ class WSAM(torch.optim.Optimizer):
                 
                 d_p = p.grad.data
                 
-                param_state['step_length'] = param_state['old_g'].mul(-step_size/self.old_grad_norm)
+                param_state['step_length'] = (param_state['old_g'].mul(-inner_rho/self.old_grad_norm)).clone().detach()
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
@@ -76,7 +75,7 @@ class WSAM(torch.optim.Optimizer):
                 if 'step_length' not in param_state:
                     param_state['step_length'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 p.add_(param_state['step_length'])
-
+                
     @torch.no_grad()
     def step(self, closure=None):
         assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
