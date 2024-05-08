@@ -20,7 +20,7 @@ class CHAUSAM(torch.optim.Optimizer):
         self.state["step"] += 1
         self.first_grad_norm = self._grad_norm()
         for group in self.param_groups:
-            scale = group["inner_rho"] / (self.old_grad_norm + 1e-12)
+            scale = group["inner_rho"] / (self.first_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
@@ -39,7 +39,7 @@ class CHAUSAM(torch.optim.Optimizer):
     def second_step(self, zero_grad=False):   
         self.second_grad_norm = self._grad_norm()
         for group in self.param_groups:
-            scale = group["rho"] / (self.old_grad_norm + 1e-12)
+            scale = group["rho"] / (self.second_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
