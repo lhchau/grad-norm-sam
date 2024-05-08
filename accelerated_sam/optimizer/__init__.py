@@ -16,6 +16,7 @@ from .varsam2 import VARSAM2
 from .fsam2 import FSAM2
 from .extrasam import EXTRASAM
 from .wsam import WSAM
+from .chausam import CHAUSAM
 
 
 def get_optimizer(
@@ -119,6 +120,12 @@ def get_optimizer(
         )
     elif opt_name == 'wsam':
         return WSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'chausam':
+        return CHAUSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
