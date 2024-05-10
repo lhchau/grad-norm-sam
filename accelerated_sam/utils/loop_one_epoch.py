@@ -141,6 +141,18 @@ def loop_one_epoch(
             try: 
                 logging_dict[(f'{loop_type.title()}/weight_norm', batch_idx)] = [optimizer.weight_norm, len(dataloader)]
             except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/sim_first_second_list', batch_idx)] = [optimizer.sim_first_second_list, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/sim_first_third_list', batch_idx)] = [optimizer.sim_first_third_list, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/sim_second_third_list', batch_idx)] = [optimizer.sim_second_third_list, len(dataloader)]
+            except: pass
           
             try: 
                 logging_dict[(f'{loop_type.title()}/sim1', batch_idx)] = [optimizer.sim1, len(dataloader)]

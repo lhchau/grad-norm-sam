@@ -44,8 +44,8 @@ class CHAUSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                param_state['old_g'] = p.grad.clone().detach()
-                
+                param_state['second_g'] = p.grad.clone().detach()
+                                
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
@@ -54,6 +54,11 @@ class CHAUSAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def third_step(self, zero_grad=False):
+        step = self.state["step"]
+        sim_first_second_list = []
+        sim_first_third_list = []
+        sim_second_third_list = []
+        
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -61,6 +66,13 @@ class CHAUSAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
+                
+                param_state['third_g'] = p.grad.clone().detach()
+                
+                if (step + 1) % 352 == 0:
+                    sim_first_second_list.append(self.cosine_similarity(param_state['first_g'], param_state['second_g']))
+                    sim_first_third_list.append(self.cosine_similarity(param_state['first_g'], param_state['third_g']))
+                    sim_second_third_list.append(self.cosine_similarity(param_state['second_g'], param_state['third_g']))
                 
                 p.add_(param_state["e_w_prime"])          # get back to "w + e_w" from "w + e_w - e_w'"
                 p.sub_(param_state["e_w"])        # get back to "w" from "w + e_w"
@@ -76,6 +88,11 @@ class CHAUSAM(torch.optim.Optimizer):
                 
                 p.add_(param_state['exp_avg'], alpha=-step_size)
                 
+        if (step + 1) % 352 == 0:
+            self.sim_first_second_list = np.mean(sim_first_second_list)
+            self.sim_first_third_list = np.mean(sim_first_third_list)
+            self.sim_second_third_list = np.mean(sim_second_third_list)
+            
         if zero_grad: self.zero_grad()
     
     @torch.no_grad()
