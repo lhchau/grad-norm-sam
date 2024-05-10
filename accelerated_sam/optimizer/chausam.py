@@ -25,7 +25,7 @@ class CHAUSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.sub_(param_state["e_w"])  # get back to "w" from "w + old_e_w"
+                # p.sub_(param_state["e_w"])  # get back to "w" from "w + old_e_w"
 
                 param_state['first_g'] = p.grad.clone().detach()
                 

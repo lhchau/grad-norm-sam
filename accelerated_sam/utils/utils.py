@@ -23,6 +23,8 @@ def override_cfg(cfg, args):
         cfg['optimizer']['opt_hyperparameter']['rho'] = args.rho
     if args.inner_rho is not None:
         cfg['optimizer']['opt_hyperparameter']['inner_rho'] = args.inner_rho
+    if args.adaptive is not None:
+        cfg['optimizer']['opt_hyperparameter']['adaptive'] = args.adaptive
     if args.model_name is not None:
         cfg['model']['model_name'] = args.model_name
     if args.opt_name is not None:

@@ -38,19 +38,20 @@ def loop_one_epoch(
                 disable_running_stats(net)
                 criterion(net(inputs), targets).backward()
                 optimizer.second_step(zero_grad=True)
-            elif opt_name == 'CHAUSAM':
-                with torch.no_grad():
-                    outputs = net(inputs)
-                    first_loss = criterion(outputs, targets)
-                optimizer.step_backward()
+            elif opt_name.startswith('CHAUSAM'):
                 enable_running_stats(net)  # <- this is the important line
-                criterion(net(inputs), targets).backward()
+                outputs = net(inputs)
+                first_loss = criterion(outputs, targets)
+                first_loss.backward()
                 optimizer.first_step(zero_grad=True)
                 disable_running_stats(net)
                 criterion(net(inputs), targets).backward()
                 optimizer.second_step(zero_grad=True)
                 criterion(net(inputs), targets).backward()
                 optimizer.third_step(zero_grad=True)
+                if opt_name == 'CHAUSAM2':
+                    criterion(net(inputs), targets).backward()
+                    optimizer.forth_step(zero_grad=True)
             else:
                 enable_running_stats(net)  # <- this is the important line
                 outputs = net(inputs)

@@ -1,13 +1,13 @@
 import torch
 import numpy as np
 
-# Worst Sharpness-Aware Minimization
-class WSAM(torch.optim.Optimizer):
+# CHAU Sharpness-Aware Minimization
+class CHAUSAM2(torch.optim.Optimizer):
     def __init__(self, params, base_optimizer, rho=0.05, inner_rho=0.01, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, inner_rho=inner_rho, adaptive=adaptive, **kwargs)
-        super(WSAM, self).__init__(params, defaults)
+        super(CHAUSAM2, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
@@ -18,48 +18,66 @@ class WSAM(torch.optim.Optimizer):
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state["step"] += 1
-        self.old_grad_norm = self._grad_norm()
+        self.first_grad_norm = self._grad_norm()
         for group in self.param_groups:
-            scale = group["rho"] / (self.old_grad_norm + 1e-12)
+            scale = group["inner_rho"] / (self.first_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.sub_(param_state["step_length"])  # get back to "w" from "w-worst"
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                p.add_(e_w)  # move to the local maximum "w + estimate(e_w)"
+                
+                param_state["e_w"] = e_w.clone().detach()
+        if zero_grad: self.zero_grad()      
 
-                if 'exp_avg_old_g' not in param_state:
-                    param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].mul_(self.beta).add_(p.grad)
-                # param_state['exp_avg_old_g'].lerp_(p.grad, 1 - self.beta)
-                # param_state['old_g'] = p.grad.clone().detach()
+
+    @torch.no_grad()
+    def second_step(self, zero_grad=False):   
+        self.second_grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["inner_rho"] / (self.second_grad_norm + 1e-12)
+            for p in group["params"]:
+                if p.grad is None: continue
+                param_state = self.state[p]
+                
+                p.sub_(param_state["e_w"])  # get back to "w" from "w + old_e_w"
+
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                p.sub_(e_w)  # move to the local mimnimum "w - e'(w)"
+                
+                param_state["e_w_prime"] = e_w.clone().detach()
+        if zero_grad: self.zero_grad()
+
+    @torch.no_grad()
+    def third_step(self, zero_grad=False):   
+        self.third_grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["rho"] / (self.third_grad_norm + 1e-12)
+            for p in group["params"]:
+                if p.grad is None: continue
+                param_state = self.state[p]
                 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
-                p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                p.add_(e_w)  # climb to the local maximum "w - e_w' + e_w"
                 
                 param_state["e_w"] = e_w.clone().detach()
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
-    def second_step(self, zero_grad=False):
-        self.exp_avg_old_grad_norm = self._grad_norm(by='exp_avg_old_g')
+    def forth_step(self, zero_grad=False):
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
             momentum = group['momentum']
-            inner_rho = group["inner_rho"]
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.sub_(param_state["e_w"])          # get back to "w-worst" from "w-worst + e(w-worst)"
-                # p.sub_(param_state["step_length"])  # get back to "w" from "w-worst"
+                p.add_(param_state["e_w_prime"])          # get back to "w + e_w" from "w - e_w' + e_w"
+                p.sub_(param_state["e_w"])                # get back to "w" from "w + e_w"
                 
                 d_p = p.grad.data
-                
-                # param_state['step_length'] = (param_state['old_g'].mul(-inner_rho/self.old_grad_norm)).clone().detach()
-                # param_state['step_length'] = (param_state['old_g'].mul(inner_rho/self.old_grad_norm)).clone().detach()
-                param_state['step_length'] = (param_state['exp_avg_old_g'].mul(-inner_rho/self.exp_avg_old_grad_norm)).clone().detach()
-                # param_state['step_length'] = (param_state['exp_avg_old_g'].mul(-step_size*4/self.exp_avg_old_grad_norm)).clone().detach()
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)
@@ -72,15 +90,6 @@ class WSAM(torch.optim.Optimizer):
                 
         if zero_grad: self.zero_grad()
     
-    @torch.no_grad()
-    def step_forward(self):
-        for group in self.param_groups:
-            for p in group["params"]:
-                param_state = self.state[p]
-                if 'step_length' not in param_state:
-                    param_state['step_length'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                p.add_(param_state['step_length'])
-                
     @torch.no_grad()
     def step(self, closure=None):
         assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
