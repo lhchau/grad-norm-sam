@@ -4,7 +4,7 @@ import math
 
 
 class CLIPSAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+    def __init__(self, params, base_optimizer, rho=0.05, percentile=0.95, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
@@ -13,6 +13,7 @@ class CLIPSAM(torch.optim.Optimizer):
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
+        self.percentile = percentile
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
@@ -23,7 +24,7 @@ class CLIPSAM(torch.optim.Optimizer):
                 
                 ori_shape = p.grad.shape
                 d_t = p.grad.view(-1)
-                d_t = self.clip_by_top_percent(d_t)
+                d_t = self.clip_by_top_percent(d_t, self.percentile)
                 param_state['d_t'] = d_t.reshape(ori_shape)
 
         self.old_grad_norm = self._grad_norm(by='d_t')
