@@ -65,8 +65,9 @@ class CLIPSAM(torch.optim.Optimizer):
         
     @torch.no_grad()
     def clip_by_top_percent(self, d_t, percent=0.9):
-        percentile_value = torch.quantile(d_t, percent)
-        d_t_clipped = torch.clamp(d_t, min=-percentile_value, max=percentile_value)
+        bot_percentile_value = torch.quantile(d_t, 1-percent)
+        top_percentile_value = torch.quantile(d_t, percent)
+        d_t_clipped = torch.clamp(d_t, min=bot_percentile_value, max=top_percentile_value)
         return d_t_clipped
 
     @torch.no_grad()
