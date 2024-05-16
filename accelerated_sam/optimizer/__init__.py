@@ -19,6 +19,7 @@ from .wsam import WSAM
 from .chausam import CHAUSAM
 from .chausam2 import CHAUSAM2
 from .samasc import SAMASC
+from .csam import CSAM
 
 
 def get_optimizer(
@@ -140,6 +141,12 @@ def get_optimizer(
         )
     elif opt_name == 'samasc':
         return SAMASC(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'csam':
+        return CSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
