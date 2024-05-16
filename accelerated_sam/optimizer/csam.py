@@ -24,10 +24,14 @@ class CSAM(torch.optim.Optimizer):
         
         for group in self.param_groups:
             for p in group["params"]:
+                if p.grad is None: continue
+                param_state = self.state[p]
+
                 if 'exp_avg_old_g' not in param_state:
                     param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg_old_g'].lerp_(p.grad, 1 - self.beta1)
                 
+                # residual = p.grad - param_state['exp_avg_old_g']
                 if 'exp_avg_var_old_g' not in param_state:
                     param_state['exp_avg_var_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg_var_old_g'].mul_(self.beta2).addcmul_( p.grad, p.grad, value=1 - self.beta2)
