@@ -22,7 +22,7 @@ class VASAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                e_w = (p.abs() if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                e_w = (p.abs().sqrt() if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 param_state["e_w"] = e_w.clone()
         if zero_grad: self.zero_grad()
@@ -65,7 +65,7 @@ class VASAM(torch.optim.Optimizer):
         if by is None:
             norm = torch.norm(
                         torch.stack([
-                            ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                            ((torch.abs(p).sqrt() if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
                             for group in self.param_groups for p in group["params"]
                             if p.grad is not None
                         ]),
