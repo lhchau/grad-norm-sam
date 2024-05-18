@@ -21,6 +21,8 @@ from .chausam2 import CHAUSAM2
 from .samasc import SAMASC
 from .csam import CSAM
 from .clipsam import CLIPSAM
+from .chausam3 import CHAUSAM3
+from .vasam import VASAM
 
 
 def get_optimizer(
@@ -140,6 +142,12 @@ def get_optimizer(
             base_optimizer, 
             **opt_hyperparameter
         )
+    elif opt_name == 'chausam3':
+        return CHAUSAM3(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
     elif opt_name == 'samasc':
         return SAMASC(
             net.parameters(), 
@@ -148,6 +156,12 @@ def get_optimizer(
         )
     elif opt_name == 'csam':
         return CSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'vasam':
+        return VASAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter

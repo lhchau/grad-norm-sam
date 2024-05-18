@@ -74,8 +74,8 @@ class CHAUSAM2(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.add_(param_state["e_w_prime"])          # get back to "w + e_w" from "w - e_w' + e_w"
-                p.sub_(param_state["e_w"])                # get back to "w" from "w + e_w"
+                p.sub_(param_state["e_w"])                # get back to "w - e_w" from "w - e_w' + e_w"
+                # p.add_(param_state["e_w_prime"])          # get back to "w" from "w - e_w'"
                 
                 d_p = p.grad.data
                 

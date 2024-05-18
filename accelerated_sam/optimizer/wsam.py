@@ -29,9 +29,9 @@ class WSAM(torch.optim.Optimizer):
 
                 if 'exp_avg_old_g' not in param_state:
                     param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].mul_(self.beta).add_(p.grad)
+                # param_state['exp_avg_old_g'].mul_(self.beta).add_(p.grad)
                 # param_state['exp_avg_old_g'].lerp_(p.grad, 1 - self.beta)
-                # param_state['old_g'] = p.grad.clone().detach()
+                param_state['old_g'] = p.grad.clone().detach()
                 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
@@ -56,9 +56,9 @@ class WSAM(torch.optim.Optimizer):
                 
                 d_p = p.grad.data
                 
-                # param_state['step_length'] = (param_state['old_g'].mul(-inner_rho/self.old_grad_norm)).clone().detach()
+                param_state['step_length'] = (param_state['old_g'].mul(-inner_rho/self.old_grad_norm)).clone().detach()
                 # param_state['step_length'] = (param_state['old_g'].mul(inner_rho/self.old_grad_norm)).clone().detach()
-                param_state['step_length'] = (param_state['exp_avg_old_g'].mul(-inner_rho/self.exp_avg_old_grad_norm)).clone().detach()
+                # param_state['step_length'] = (param_state['exp_avg_old_g'].mul(-inner_rho/self.exp_avg_old_grad_norm)).clone().detach()
                 # param_state['step_length'] = (param_state['exp_avg_old_g'].mul(-step_size*4/self.exp_avg_old_grad_norm)).clone().detach()
                 
                 if weight_decay != 0:

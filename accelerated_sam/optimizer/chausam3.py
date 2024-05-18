@@ -1,63 +1,55 @@
 import torch
 import numpy as np
-import math
 
-
-class CSAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+# CHAU Sharpness-Aware Minimization
+class CHAUSAM3(torch.optim.Optimizer):
+    def __init__(self, params, base_optimizer, rho=0.05, inner_rho=0.01, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(CSAM, self).__init__(params, defaults)
+        defaults = dict(rho=rho, inner_rho=inner_rho, adaptive=adaptive, **kwargs)
+        super(CHAUSAM3, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
-        self.beta1, self.beta2 = 0.9, 0.95
-        self.state['step'] = 0
-        self.eps = 1e-8
+        self.beta = 0.9
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
-        self.state['step'] += 1
-
-        bias_correction1 = 1 - self.beta1 ** self.state['step']
-        bias_correction2 = 1 - self.beta2 ** self.state['step']
-        
+        self.first_grad_norm = self._grad_norm()
         for group in self.param_groups:
+            scale = group["inner_rho"] / (self.first_grad_norm + 1e-12)
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
 
-                if 'exp_avg_old_g' not in param_state:
-                    param_state['exp_avg_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_old_g'].lerp_(p.grad, 1 - self.beta1)
-                
-                residual = p.grad - param_state['exp_avg_old_g']
-                if 'exp_avg_var_old_g' not in param_state:
-                    param_state['exp_avg_var_old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                param_state['exp_avg_var_old_g'].mul_(self.beta2).addcmul_( residual, residual, value=1 - self.beta2)
-                
-                numer = p.grad
-                denom = param_state['exp_avg_var_old_g'].sqrt().add_(self.eps)
-                param_state['d_t'] = numer.div(denom)
-                param_state['d_t'].mul_(math.sqrt(bias_correction2)/bias_correction1)
+                p.sub_(param_state['exp_avg_e_t'])
 
-        self.old_grad_norm = self._grad_norm(by='d_t')
-        for group in self.param_groups:
-            scale = group["rho"] / (self.old_grad_norm + 1e-12)
-            for p in group["params"]:
-                if p.grad is None: continue
-                param_state = self.state[p]
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                p.sub_(e_w)  # move to the local mimnimum "w - e'(w)"
                 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state['d_t'] * scale.to(p)
-                p.add_(e_w)  # climb to the local maximum "w + e(w)"
-                
-                param_state["e_w"] = e_w.clone()
+                param_state["e_w_prime"] = e_w.clone().detach()
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
-    def second_step(self, zero_grad=False):
+    def second_step(self, zero_grad=False):   
+        self.second_grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["rho"] / (self.second_grad_norm + 1e-12)
+            for p in group["params"]:
+                if p.grad is None: continue
+                param_state = self.state[p]
+
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                param_state['exp_avg_e_t'].lerp_(e_w, 1 - self.beta)
+                
+                p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                
+                param_state["e_w"] = e_w.clone().detach()
+        if zero_grad: self.zero_grad()
+
+    @torch.no_grad()
+    def third_step(self, zero_grad=False):
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -66,7 +58,9 @@ class CSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                p.sub_(param_state["e_w"])  # get back to "w" from "w + e(w)"
+                p.add_(param_state["e_w_prime"])          # get back to "w + e_w" from "w + e_w - e_w'"
+                p.sub_(param_state["e_w"])                # get back to "w" from "w + e_w"
+                
                 d_p = p.grad.data
                 
                 if weight_decay != 0:
@@ -79,7 +73,16 @@ class CSAM(torch.optim.Optimizer):
                 p.add_(param_state['exp_avg'], alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
-
+    
+    @torch.no_grad()
+    def step_backward(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                param_state = self.state[p]
+                if 'exp_avg_e_t' not in param_state:
+                    param_state['exp_avg_e_t'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                p.add_(param_state['exp_avg_e_t'])
+                
     @torch.no_grad()
     def step(self, closure=None):
         assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"

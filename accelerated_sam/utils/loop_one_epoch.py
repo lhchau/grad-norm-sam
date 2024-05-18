@@ -38,6 +38,21 @@ def loop_one_epoch(
                 disable_running_stats(net)
                 criterion(net(inputs), targets).backward()
                 optimizer.second_step(zero_grad=True)
+            elif opt_name == 'CHAUSAM3':
+                with torch.no_grad():
+                    outputs = net(inputs)
+                    first_loss = criterion(outputs, targets)
+                optimizer.step_backward()
+                enable_running_stats(net)  # <- this is the important line
+                outputs = net(inputs)
+                first_loss = criterion(outputs, targets)
+                first_loss.backward()
+                optimizer.first_step(zero_grad=True)
+                disable_running_stats(net)
+                criterion(net(inputs), targets).backward()
+                optimizer.second_step(zero_grad=True)
+                criterion(net(inputs), targets).backward()
+                optimizer.third_step(zero_grad=True)
             elif opt_name.startswith('CHAUSAM'):
                 enable_running_stats(net)  # <- this is the important line
                 outputs = net(inputs)
