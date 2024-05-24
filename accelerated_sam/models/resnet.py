@@ -31,6 +31,7 @@ class BasicBlock(nn.Module):
                 nn.BatchNorm2d(self.expansion*planes)
             )
         self.activate = nn.ReLU(inplace=True)
+        # self.activate = nn.LeakyReLU(negative_slope=0.1, inplace=True)
 
     def forward(self, x):
         out = self.activate(self.bn1(self.conv1(x)))
@@ -62,6 +63,7 @@ class Bottleneck(nn.Module):
                 nn.BatchNorm2d(self.expansion*planes)
             )
         self.activate = nn.ReLU(inplace=True)
+        # self.activate = nn.LeakyReLU(negative_slope=0.1, inplace=True)
             
 
     def forward(self, x):
@@ -92,8 +94,8 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
         self.linear = nn.Linear(512*block.expansion, num_classes)
     
-        # self.activate = nn.ReLU(inplace=True)
         self.activate = F.relu
+        # self.activate = nn.LeakyReLU(negative_slope=0.1, inplace=True)
         self.avgpool2d = nn.AdaptiveAvgPool2d(1)
 
     def _make_layer(self, block, planes, num_blocks, stride):

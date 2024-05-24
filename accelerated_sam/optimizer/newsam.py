@@ -2,12 +2,12 @@ import torch
 import numpy as np
 
 
-class SAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+class NEWSAM(torch.optim.Optimizer):
+    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, alpha=1, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(SAM, self).__init__(params, defaults)
+        defaults = dict(rho=rho, adaptive=adaptive, alpha=alpha, **kwargs)
+        super(NEWSAM, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
@@ -16,37 +16,41 @@ class SAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
-        self.state["step"] += 1
-     
-        self.weight_norm = self._weight_norm()
-        self.old_grad_norm = self._grad_norm()
         for group in self.param_groups:
-            scale = group["rho"] / (self.old_grad_norm + 1e-12)
+            alpha = group['alpha']
             for p in group["params"]:
                 if p.grad is None: continue
                 param_state = self.state[p]
+                if 'old_g' not in param_state:
+                    param_state['old_g'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                param_state['d_t'] = p.grad - param_state['old_g'].mul(alpha)
+        
+        self.old_grad_norm = self._grad_norm(by='d_t')
+        for group in self.param_groups:
+            scale = group['rho'] / (self.old_grad_norm + 1e-12)
+            for p in group['params']:
+                if p.grad is None: continue
+                param_state = self.state[p]
                 
-                param_state["old_p"] = p.data.clone()
-                
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                e_w = (torch.pow(p, 2) if group['adaptive'] else 1.0) * param_state['d_t'] * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
-                self.state[p]["old_g"] = p.grad.clone()
+                param_state['e_w'] = e_w.clone()
+                param_state['old_g'] = p.grad.clone()
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
     def second_step(self, zero_grad=False):
-        step = self.state["step"]
         for group in self.param_groups:
-            weight_decay = group["weight_decay"]
+            weight_decay = group['weight_decay']
             step_size = group['lr']
             momentum = group['momentum']
-            for p in group["params"]:
+            for p in group['params']:
                 if p.grad is None: continue
-                p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
+                param_state = self.state[p]
                 d_p = p.grad.data
                 
-                param_state = self.state[p]
+                p.sub_(param_state['e_w'])  # get back to "w" from "w + e(w)"
                 
                 if weight_decay != 0:
                     d_p.add_(p.data, alpha=weight_decay)

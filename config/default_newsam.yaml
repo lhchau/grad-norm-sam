@@ -4,12 +4,13 @@ dataloader:
 model:
   model_name: resnet18
 optimizer:
-  opt_name: asgd
+  opt_name: sam
   opt_hyperparameter:
     lr: 0.1
     momentum: 0.9
     weight_decay: 0.001
-    factor: 1.2
+    rho: 0.1
+    alpha: 1
 scheduler:
   sch_name: cosine
   sch_hyperparameter:

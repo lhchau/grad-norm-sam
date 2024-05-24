@@ -67,6 +67,11 @@ def loop_one_epoch(
                 if opt_name == 'CHAUSAM2':
                     criterion(net(inputs), targets).backward()
                     optimizer.forth_step(zero_grad=True)
+            elif opt_name == 'ASGD':
+                outputs = net(inputs)
+                first_loss = criterion(outputs, targets)
+                first_loss.backward()
+                optimizer.first_step(zero_grad=True)
             else:
                 enable_running_stats(net)  # <- this is the important line
                 outputs = net(inputs)

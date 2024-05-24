@@ -28,7 +28,7 @@ current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 ################################
 parser = argparse.ArgumentParser(description='PyTorch Training')
 parser.add_argument('--experiment', default='example', type=str, help='path to YAML config file')
-parser.add_argument('--alpha', default=None, type=float, help='FZSAM alpha')
+parser.add_argument('--alpha', default=None, type=float, help='FZSAM or NEWSAM alpha')
 parser.add_argument('--alpha1', default=None, type=float, help='VARSAM alpha1')
 parser.add_argument('--alpha2', default=None, type=float, help='VARSAM alpha2')
 parser.add_argument('--rho', default=None, type=float, help='SAM rho')
