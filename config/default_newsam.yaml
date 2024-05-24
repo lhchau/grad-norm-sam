@@ -4,7 +4,7 @@ dataloader:
 model:
   model_name: resnet18
 optimizer:
-  opt_name: sam
+  opt_name: newsam
   opt_hyperparameter:
     lr: 0.1
     momentum: 0.9
