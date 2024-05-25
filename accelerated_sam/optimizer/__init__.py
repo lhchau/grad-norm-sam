@@ -25,6 +25,7 @@ from .chausam3 import CHAUSAM3
 from .vasam import VASAM
 from .asgd import ASGD
 from .newsam import NEWSAM
+from .scalesam import SCALESAM
 
 
 def get_optimizer(
@@ -182,6 +183,12 @@ def get_optimizer(
         )
     elif opt_name == 'newsam':
         return NEWSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'scalesam':
+        return SCALESAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
