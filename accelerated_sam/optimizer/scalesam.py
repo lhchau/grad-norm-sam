@@ -42,7 +42,7 @@ class SCALESAM(torch.optim.Optimizer):
                 numer = param_state['exp_avg_old_g']
                 denom = param_state['exp_avg_old_g_sq'].sqrt().add_(self.eps)
                 
-                e_w.mul(numer.abs().div(denom))
+                e_w.mul_(numer.abs().div(denom))
                 
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
