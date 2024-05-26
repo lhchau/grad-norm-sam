@@ -13,6 +13,7 @@ class EXPLORESAM(torch.optim.Optimizer):
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
         self.rho_prime = 0.05
+        self.eps = 1e-8
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
@@ -38,7 +39,7 @@ class EXPLORESAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                denom = (p.grad - param_state['first_g']).abs().sqrt()
+                denom = (p.grad - param_state['first_g']).abs().sqrt().add(self.eps)
                 param_state['d_t'] = p.grad.div(denom)
         
         self.second_grad_norm = self._grad_norm(by='d_t')
