@@ -15,14 +15,13 @@ class OTHERSAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
-        self.first_grad_norm = self._grad_norm()
         for group in self.param_groups:
-            scale = group['rho'] / (self.first_grad_norm + 1e-12)
+            scale = group['rho']
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                e_w = (torch.pow(p, 2) if group['adaptive'] else 1.0) * p.grad * scale.to(p)
+                e_w = (torch.pow(p, 2) if group['adaptive'] else 1.0) * p.grad * scale
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
                 param_state['old_g'] = p.grad.clone()
