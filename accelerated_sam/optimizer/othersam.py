@@ -36,11 +36,11 @@ class OTHERSAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                param_state['d_t'] = p.grad - param_state['old_g']
+                param_state['d_t'] = (p.grad - param_state['old_g']).div(group['rho'])
         
         self.second_grad_norm = self._grad_norm(by='d_t')
         for group in self.param_groups:
-            scale = group['rho'] / (self.second_grad_norm + 1e-12)
+            scale = 1 / (self.second_grad_norm.sqrt() + 1e-12)
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
