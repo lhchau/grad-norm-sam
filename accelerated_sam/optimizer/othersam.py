@@ -32,7 +32,7 @@ class OTHERSAM(torch.optim.Optimizer):
     @torch.no_grad()
     def second_step(self, zero_grad=False):
         for group in self.param_groups:
-            for p in group["params"]:
+            for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
@@ -40,7 +40,7 @@ class OTHERSAM(torch.optim.Optimizer):
         
         self.second_grad_norm = self._grad_norm(by='d_t')
         for group in self.param_groups:
-            scale = group['rho'] / (self.second_grad_norm.sqrt() + 1e-12)
+            scale = group['rho'] / (self.second_grad_norm + 1e-12)
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
