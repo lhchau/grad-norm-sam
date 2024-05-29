@@ -28,6 +28,7 @@ from .newsam import NEWSAM
 from .scalesam import SCALESAM
 from .exploresam import EXPLORESAM
 from .othersam import OTHERSAM
+from .wdsam import WDSAM
 
 
 def get_optimizer(
@@ -203,6 +204,12 @@ def get_optimizer(
         )
     elif opt_name == 'othersam':
         return OTHERSAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'wdsam':
+        return WDSAM(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
