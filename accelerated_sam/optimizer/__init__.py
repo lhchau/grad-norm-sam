@@ -23,9 +23,9 @@ from .csam import CSAM
 from .clipsam import CLIPSAM
 from .chausam3 import CHAUSAM3
 from .vasam import VASAM
-from .asgd import ASGD
 from .newsam import NEWSAM
 from .scalesam import SCALESAM
+from .samhessian import SAMHESSIAN
 
 
 def get_optimizer(
@@ -175,12 +175,6 @@ def get_optimizer(
             base_optimizer, 
             **opt_hyperparameter
         )
-    elif opt_name == 'asgd':
-        return ASGD(
-            net.parameters(), 
-            base_optimizer, 
-            **opt_hyperparameter
-        )
     elif opt_name == 'newsam':
         return NEWSAM(
             net.parameters(), 
@@ -189,6 +183,12 @@ def get_optimizer(
         )
     elif opt_name == 'scalesam':
         return SCALESAM(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'samhessian':
+        return SAMHESSIAN(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter

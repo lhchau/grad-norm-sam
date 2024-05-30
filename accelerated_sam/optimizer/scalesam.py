@@ -30,19 +30,19 @@ class SCALESAM(torch.optim.Optimizer):
                     param_state['exp_avg_old_g_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 param_state['exp_avg_old_g_sq'].mul_(self.beta2).addcmul_(p.grad, p.grad.conj(), value=1 - self.beta2)
                 
-        self.old_grad_norm = self._grad_norm()
+                numer = param_state['exp_avg_old_g']
+                denom = param_state['exp_avg_old_g_sq'].sqrt().add_(self.eps)
+                
+                param_state['d_t'] = p.grad.mul(numer.div(denom))
+                
+        self.old_grad_norm = self._grad_norm(by='d_t')
         for group in self.param_groups:
             scale = group['rho'] / (self.old_grad_norm + 1e-12)
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                e_w = (torch.pow(p, 2) if group['adaptive'] else 1.0) * p.grad * scale.to(p)
-                
-                numer = param_state['exp_avg_old_g']
-                denom = param_state['exp_avg_old_g_sq'].sqrt().add_(self.eps)
-                
-                e_w.mul_(numer.abs().div(denom))
+                e_w = (torch.pow(p, 2) if group['adaptive'] else 1.0) * param_state['d_t'] * scale.to(p)
                 
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 

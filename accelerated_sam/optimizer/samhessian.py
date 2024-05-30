@@ -2,43 +2,57 @@ import torch
 import numpy as np
 
 
-class SAM(torch.optim.Optimizer):
+class SAMHESSIAN(torch.optim.Optimizer):
     def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
-        super(SAM, self).__init__(params, defaults)
+        defaults = dict(rho=rho, adaptive=adaptive,**kwargs)
+        super(SAMHESSIAN, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
         self.defaults.update(self.base_optimizer.defaults)
         self.state['step'] = 0
+        self.eps = 1e-8
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state['step'] += 1
         
-        self.old_grad_norm = self._grad_norm()
-        self.old_num_zero_grad = 0
+        params = []
+        grads = []
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is not None:
+                    params.append(p)
+                    grads.append(p.grad)
+                    
+        hut_traces = self.get_trace(params, grads)
+        
+        for group in self.param_groups:
+            for p, hut_trace in zip(group['params'], hut_traces):
+                if p.grad is None: continue
+                param_state = self.state[p]
+
+                param_state['d_t'] = p.grad.div(hut_trace.abs().sqrt().add(self.eps))
+                
+        self.old_grad_norm = self._grad_norm('d_t')
         for group in self.param_groups:
             scale = group['rho'] / (self.old_grad_norm + 1e-12)
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state['d_t'] * scale
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
                 param_state['e_w'] = e_w.clone()
-                
-                self.old_num_zero_grad += torch.sum(p.grad == 0)
+        
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
     def second_step(self, zero_grad=False):
         self.new_grad_norm = self._grad_norm()
-        self.ratio_new_old_grad_norm = self.new_grad_norm / self.old_grad_norm
-        self.new_num_zero_grad = 0
         for group in self.param_groups:
             weight_decay = group["weight_decay"]
             step_size = group['lr']
@@ -48,8 +62,6 @@ class SAM(torch.optim.Optimizer):
                 param_state = self.state[p]
                 
                 d_p = p.grad.data
-                
-                self.new_num_zero_grad += torch.sum(p.grad == 0)
                 
                 p.sub_(param_state['e_w'])  # get back to "w" from "w + e(w)"
                 
@@ -63,6 +75,57 @@ class SAM(torch.optim.Optimizer):
                 p.add_(param_state['exp_avg'], alpha=-step_size)
                 
         if zero_grad: self.zero_grad()
+        
+    def get_trace(self, params, grads):
+        """Get an estimate of Hessian Trace.
+        This is done by computing the Hessian vector product with a random
+        vector v at the current gradient point, to estimate Hessian trace by
+        computing the gradient of <gradsH,v>.
+        :param gradsH: a list of torch variables
+        :return: a list of torch tensors
+        """
+
+        # Check backward was called with create_graph set to True
+        for i, grad in enumerate(grads):
+            if grad.grad_fn is None:
+                msg = (
+                    "Gradient tensor {:} does not have grad_fn. When "
+                    "calling loss.backward(), make sure the option "
+                    "create_graph is set to True."
+                )
+                raise RuntimeError(msg.format(i))
+
+        v = [
+            2
+            * torch.randint_like(
+                p, high=2, memory_format=torch.preserve_format
+            )
+            - 1
+            for p in params
+        ]
+
+        # this is for distributed setting with single node and multi-gpus,
+        # for multi nodes setting, we have not support it yet.
+        hvs = torch.autograd.grad(
+            grads, params, grad_outputs=v, only_inputs=True, retain_graph=True
+        )
+
+        hutchinson_trace = []
+        for hv in hvs:
+            param_size = hv.size()
+            if len(param_size) <= 2:  # for 0/1/2D tensor
+                # Hessian diagonal block size is 1 here.
+                # We use that torch.abs(hv * vi) = hv.abs()
+                tmp_output = hv.abs()
+
+            elif len(param_size) == 4:  # Conv kernel
+                # Hessian diagonal block size is 9 here: torch.sum() reduces
+                # the dim 2/3.
+                # We use that torch.abs(hv * vi) = hv.abs()
+                tmp_output = torch.mean(hv.abs(), dim=[2, 3], keepdim=True)
+            hutchinson_trace.append(tmp_output)
+
+        return hutchinson_trace
 
     @torch.no_grad()
     def step(self, closure=None):

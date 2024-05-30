@@ -53,7 +53,7 @@ def loop_one_epoch(
                 optimizer.second_step(zero_grad=True)
                 criterion(net(inputs), targets).backward()
                 optimizer.third_step(zero_grad=True)
-            elif opt_name.startswith('CHAUSAM'):
+            elif opt_name.startswith('CHAUSAM') or opt_name == 'OTHERSAM':
                 enable_running_stats(net)  # <- this is the important line
                 outputs = net(inputs)
                 first_loss = criterion(outputs, targets)
@@ -67,17 +67,20 @@ def loop_one_epoch(
                 if opt_name == 'CHAUSAM2':
                     criterion(net(inputs), targets).backward()
                     optimizer.forth_step(zero_grad=True)
-            elif opt_name == 'ASGD':
+            elif opt_name == 'SGD':
                 outputs = net(inputs)
                 first_loss = criterion(outputs, targets)
                 first_loss.backward()
-                optimizer.first_step(zero_grad=True)
+                optimizer.step(zero_grad=True)
             else:
                 enable_running_stats(net)  # <- this is the important line
                 outputs = net(inputs)
                 first_loss = criterion(outputs, targets)
-                first_loss.backward(retain_graph=True)        
+                first_loss.backward(create_graph=True)        
                 optimizer.first_step(zero_grad=True)
+                # Zero the gradients explicitly
+                for param in net.parameters():
+                    param.grad = None
                 
                 if opt_name.startswith('VARSAM') or opt_name == "EXTRASAM":
                     disable_running_stats(net)  # <- this is the important line
@@ -102,6 +105,7 @@ def loop_one_epoch(
                 acc = 100.*correct/total
                 progress_bar(batch_idx, len(dataloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                         % (loss_mean, acc, correct, total))
+                
             try: 
                 logging_dict[(f'{loop_type.title()}/hessian_norm', batch_idx)] = [optimizer.hessian_norm, len(dataloader)]
             except: pass
@@ -113,80 +117,37 @@ def loop_one_epoch(
             try: 
                 logging_dict[(f'{loop_type.title()}/new_grad_norm', batch_idx)] = [optimizer.new_grad_norm, len(dataloader)]
             except: pass
+
+            try: 
+                logging_dict[(f'{loop_type.title()}/old_num_zero_grad', batch_idx)] = [optimizer.old_num_zero_grad, len(dataloader)]
+            except: pass
             
+            try: 
+                logging_dict[(f'{loop_type.title()}/new_num_zero_grad', batch_idx)] = [optimizer.new_num_zero_grad, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/ratio_new_old_grad_norm', batch_idx)] = [optimizer.ratio_new_old_grad_norm, len(dataloader)]
+            except: pass
+
+            try: 
+                logging_dict[(f'{loop_type.title()}/first_grad_norm', batch_idx)] = [optimizer.first_grad_norm, len(dataloader)]
+            except: pass
+            
+            try: 
+                logging_dict[(f'{loop_type.title()}/second_grad_norm', batch_idx)] = [optimizer.second_grad_norm, len(dataloader)]
+            except: pass
+           
             try: 
                 logging_dict[(f'{loop_type.title()}/third_grad_norm', batch_idx)] = [optimizer.third_grad_norm, len(dataloader)]
             except: pass
             
             try: 
-                logging_dict[(f'{loop_type.title()}/norm_d_norm_d_p', batch_idx)] = [optimizer.norm_d_norm_d_p, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm', batch_idx)] = [optimizer.exp_avg_old_grad_norm, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/exp_avg_old_grad_norm_sq', batch_idx)] = [optimizer.exp_avg_old_grad_norm_sq, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/var_old_grad_norm_sq', batch_idx)] = [optimizer.var_old_grad_norm_sq, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/var_old_grad', batch_idx)] = [optimizer.var_old_grad, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/norm_exp_avg_d_norm_d_p', batch_idx)] = [optimizer.norm_exp_avg_d_norm_d_p, len(dataloader)]
-            except: pass
-              
-            try: 
-                logging_dict[(f'{loop_type.title()}/num_clamped_elements', batch_idx)] = [optimizer.num_clamped_elements, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/cnt_diff_sign', batch_idx)] = [optimizer.cnt_diff_sign, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/cnt_reg_diff_sign', batch_idx)] = [optimizer.cnt_reg_diff_sign, len(dataloader)]
-            except: pass
-
-            try: 
-                logging_dict[(f'{loop_type.title()}/num_zero_elements', batch_idx)] = [optimizer.num_zero_elements, len(dataloader)]
-            except: pass
-            
-            try: 
                 logging_dict[(f'{loop_type.title()}/weight_norm', batch_idx)] = [optimizer.weight_norm, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/sim_first_second_list', batch_idx)] = [optimizer.sim_first_second_list, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/sim_first_third_list', batch_idx)] = [optimizer.sim_first_third_list, len(dataloader)]
-            except: pass
-            
-            try: 
-                logging_dict[(f'{loop_type.title()}/sim_second_third_list', batch_idx)] = [optimizer.sim_second_third_list, len(dataloader)]
             except: pass
           
             try: 
                 logging_dict[(f'{loop_type.title()}/sim1', batch_idx)] = [optimizer.sim1, len(dataloader)]
-                logging_dict[(f'{loop_type.title()}/sim2', batch_idx)] = [optimizer.sim2, len(dataloader)]
-                logging_dict[(f'{loop_type.title()}/sim3', batch_idx)] = [optimizer.sim3, len(dataloader)]
-                logging_dict[(f'{loop_type.title()}/sim4', batch_idx)] = [optimizer.sim4, len(dataloader)]
-                logging_dict[(f'{loop_type.title()}/sim5', batch_idx)] = [optimizer.sim5, len(dataloader)]
-            except: pass
-            
-            try: 
-                name_list = [n for n, _ in net.named_parameters()]
-                for group in optimizer.param_groups:
-                    for n, p in zip(name_list, group["params"]):
-                        logging_dict[(f'Summary/{n}_mean', batch_idx)] = [optimizer.state[p]['mean'], len(dataloader)]
             except: pass
     else:
         if loop_type == 'test':
