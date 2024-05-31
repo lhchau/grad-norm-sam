@@ -51,7 +51,7 @@ class SAMHESS(torch.optim.Optimizer):
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                param_state['d_t'] = p.grad.div(param_state['exp_hessian_diag'].sqrt().add(self.eps))
+                param_state['d_t'] = p.grad.div(param_state['exp_hessian_diag'].add(self.eps))
                 
         self.old_grad_norm = self._grad_norm('d_t')
         for group in self.param_groups:
