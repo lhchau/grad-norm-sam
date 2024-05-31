@@ -26,6 +26,7 @@ from .vasam import VASAM
 from .newsam import NEWSAM
 from .scalesam import SCALESAM
 from .samhessian import SAMHESSIAN
+from .samhess import SAMHESS
 
 
 def get_optimizer(
@@ -189,6 +190,12 @@ def get_optimizer(
         )
     elif opt_name == 'samhessian':
         return SAMHESSIAN(
+            net.parameters(), 
+            base_optimizer, 
+            **opt_hyperparameter
+        )
+    elif opt_name == 'samhess':
+        return SAMHESS(
             net.parameters(), 
             base_optimizer, 
             **opt_hyperparameter
