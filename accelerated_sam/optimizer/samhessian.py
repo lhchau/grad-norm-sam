@@ -3,10 +3,10 @@ import numpy as np
 
 
 class SAMHESSIAN(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+    def __init__(self, params, base_optimizer, rho=0.05, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        defaults = dict(rho=rho, adaptive=adaptive,**kwargs)
+        defaults = dict(rho=rho,**kwargs)
         super(SAMHESSIAN, self).__init__(params, defaults)
 
         self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
@@ -14,10 +14,12 @@ class SAMHESSIAN(torch.optim.Optimizer):
         self.defaults.update(self.base_optimizer.defaults)
         self.state['step'] = 0
         self.eps = 1e-8
+        self.beta2 = 0.9
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):   
         self.state['step'] += 1
+        self.weight_norm = self._weight_norm()
         
         params = []
         grads = []
@@ -30,20 +32,26 @@ class SAMHESSIAN(torch.optim.Optimizer):
         hut_traces = self.get_trace(params, grads)
         
         for group in self.param_groups:
+
             for p, hut_trace in zip(group['params'], hut_traces):
                 if p.grad is None: continue
                 param_state = self.state[p]
-
-                param_state['d_t'] = p.grad.div(hut_trace.abs().sqrt().add(self.eps))
                 
-        self.old_grad_norm = self._grad_norm('d_t')
+                # if 'exp_hessian_diag' not in param_state:
+                #     param_state['exp_hessian_diag'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                # param_state['exp_hessian_diag'].mul_(self.beta2).add_(
+                #     hut_trace, alpha=1 - self.beta2
+                # ) 
+                param_state['exp_hessian_diag'] = hut_trace
+                
+        self.old_grad_norm = self._grad_norm()
         for group in self.param_groups:
             scale = group['rho'] / (self.old_grad_norm + 1e-12)
             for p in group['params']:
                 if p.grad is None: continue
                 param_state = self.state[p]
                 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * param_state['d_t'] * scale
+                e_w = torch.pow(param_state['exp_hessian_diag'], 2) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 
                 param_state['e_w'] = e_w.clone()
@@ -142,7 +150,7 @@ class SAMHESSIAN(torch.optim.Optimizer):
         if by is None:
             norm = torch.norm(
                         torch.stack([
-                            ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                            ((self.state[p]['exp_hessian_diag'] if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
                             for group in self.param_groups for p in group["params"]
                             if p.grad is not None
                         ]),
